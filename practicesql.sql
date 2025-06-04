@@ -19,7 +19,7 @@
   group by month,city ) as ranked_city
   where rank < 3 ;
   
-  
+______________________________________________________________________________________________________  
 
 2. Write an SQL query to calculate the running total of sales for each city. 
  (sales_data):
@@ -31,6 +31,15 @@
 | 4    | Delhi  | 2024-02-05 | 6000 
 | 5    | Mumbai | 2024-02-08 | 8000 
 
+--Query
+  select city, 
+  sales_date,
+  amount,
+  sum(amount) over (partation by city order by sales date) as running total
+  from sales
+  order by sales_date, city;
+________________________________________________________________________________________________________
+
  3. Find the second highest salary of employees. 
  (employees):
 | emp_id | emp_name | salary | department | 
@@ -41,6 +50,17 @@
 | 4   | Aisha  | 60000  | IT     | 
 | 5   | Rahul  | 95000  | HR     | 
 
+   query
+   select max(salary) from employee where salary < (select max(salary) from employee)
+
+   with sal as (
+   select salary,
+   rank() over (order by salary desc) as sal_rank
+   from employee ) 
+   select salary from sal where sal_rank = 2;
+   ___________________________________________________________________________________________________
+   
+
  4. Find employees who have the same salary as someone in the same department. 
  (employee_salary):
 | emp_id | emp_name | salary | department | 
@@ -50,6 +70,16 @@
 | 3   | Aman  | 50000  | HR     | 
 | 4   | Pooja  | 90000  | IT     | 
 | 5   | Karan  | 70000  | IT     | 
+
+   Query
+   select emp_name , salary, department from 
+   employee_salary e1 join 
+   employee_salary e2 on 
+   e1.salary = e2.salary
+   where e1.emp_id <> e2.emp_id and
+   e1.department = e2.department
+
+____________________________________________________________________________________________
 
 5. Write an SQL query to find duplicate records in a table. 
  (users):
