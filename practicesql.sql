@@ -159,5 +159,36 @@ Sample Data (orders):
 | 4    | 103    | 2024-04-05 | 2500 
 | 5    | 101    | 2024-05-08 | 3000 
 
+  SELECT customer_id
+FROM orders
+WHERE order_date >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+GROUP BY customer_id
+HAVING COUNT(*) >= 3;
+
+__________________________________________________________________
+
+
+  
+
 9. Normalization vs. Denormalization – What are they, and when should each be used in a data pipeline? 
-10. Indexing in SQL – Explain clustered vs. non-clustered indexes. How do they impact query performance? 
+A:
+Normalization is the process of organizing data into multiple related tables to reduce data redundancy and improve data integrity. It ensures that updates and inserts are efficient and consistent. 
+ It's commonly used in transactional systems (OLTP), like customer management or order processing databases, where data consistency is critical.
+On the other hand, Denormalization combines related tables into a single table to reduce joins and improve read performance. This is typically used in data pipelines or analytics systems (OLAP), 
+ like dashboards or reports, where fast query performance is more important than saving storage.
+In a data pipeline, I would use normalization during data ingestion or storage stages to maintain clean, consistent data. Then, 
+  I might use denormalization when preparing data for analysis or loading into a data warehouse to make queries faster and simpler.
+
+  --------------------------------------------------------------------------------------------------------------------
+  
+10. Indexing in SQL – Explain clustered vs. non-clustered indexes. How do they impact query performance?
+  Indexing in SQL is a technique used to improve the speed of data retrieval operations. It works like an index in a book — instead of scanning every row, 
+  the database engine can quickly locate the data using the index.
+A clustered index sorts and stores the actual table data according to the index. So, the table itself is organized based on this index. 
+  There can only be one clustered index per table because data can be physically sorted in only one way. It's typically created on the primary key.
+A non-clustered index, on the other hand, creates a separate structure that stores the indexed column and a pointer to the actual row in the table.
+  A table can have multiple non-clustered indexes, and they’re useful for improving performance on frequently filtered, joined, or sorted columns.
+In terms of query performance, indexes help reduce the time needed for SELECT queries, especially on large tables. 
+  However, they can slightly slow down INSERT, UPDATE, and DELETE operations because the indexes must be updated as well.
+In short, clustered indexes are best for range-based or primary key queries, while non-clustered indexes are ideal for optimizing search on other frequently queried fields.
+  
