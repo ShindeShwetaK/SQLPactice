@@ -91,9 +91,35 @@ ________________________________________________________________________________
 | 4    | Rohan  | rohan@gmail.com 
 | 5    | Rohan  | rohan@gmail.com 
 
+SELECT user_name, email, COUNT(*) AS count
+FROM users
+GROUP BY user_name, email
+HAVING COUNT(*) > 1;
+
+________________________________________________________________________________________
+
  6. Write an SQL query to delete duplicate rows while keeping only one unique record. 
 (Same sample data as Question 5)
 
+WITH CTE AS (
+    SELECT 
+        user_id,
+        user_name,
+        email,
+        ROW_NUMBER() OVER (PARTITION BY user_name, email ORDER BY user_id) AS rn
+    FROM users
+)
+DELETE FROM users
+WHERE user_id IN (
+    SELECT user_id
+    FROM CTE
+    WHERE rn > 1
+);
+
+____________________________________________________________________________________
+
+
+   
  7. Write an SQL query to pivot a table by months. 
 Sample Data (sales_data):
 | sale_id | city   | sale_date | amount | 
@@ -102,7 +128,26 @@ Sample Data (sales_data):
 | 2    | Delhi  | 2024-02-15 | 7000 
 | 3    | Mumbai | 2024-01-20 | 3000 
 | 4    | Delhi  | 2024-03-05 | 6000 
-| 5    | Mumbai | 2024-02-08 | 8000 
+| 5    | Mumbai | 2024-02-08 | 8000
+
+   SELECT 
+    city,
+    SUM(CASE WHEN EXTRACT(MONTH FROM sale_date) = 1 THEN amount END) AS Jan,
+    SUM(CASE WHEN EXTRACT(MONTH FROM sale_date) = 2 THEN amount END) AS Feb,
+    SUM(CASE WHEN EXTRACT(MONTH FROM sale_date) = 3 THEN amount END) AS Mar,
+    SUM(CASE WHEN EXTRACT(MONTH FROM sale_date) = 4 THEN amount END) AS Apr,
+    SUM(CASE WHEN EXTRACT(MONTH FROM sale_date) = 5 THEN amount END) AS May,
+    SUM(CASE WHEN EXTRACT(MONTH FROM sale_date) = 6 THEN amount END) AS Jun,
+    SUM(CASE WHEN EXTRACT(MONTH FROM sale_date) = 7 THEN amount END) AS Jul,
+    SUM(CASE WHEN EXTRACT(MONTH FROM sale_date) = 8 THEN amount END) AS Aug,
+    SUM(CASE WHEN EXTRACT(MONTH FROM sale_date) = 9 THEN amount END) AS Sep,
+    SUM(CASE WHEN EXTRACT(MONTH FROM sale_date) = 10 THEN amount END) AS Oct,
+    SUM(CASE WHEN EXTRACT(MONTH FROM sale_date) = 11 THEN amount END) AS Nov,
+    SUM(CASE WHEN EXTRACT(MONTH FROM sale_date) = 12 THEN amount END) AS Dec
+FROM sales_data
+GROUP BY city;   
+
+________________________________________________________________
 
 8. Find customers who placed at least 3 orders in the last 6 months. 
 Sample Data (orders):
