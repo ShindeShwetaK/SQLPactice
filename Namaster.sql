@@ -135,11 +135,65 @@ ORDER BY
     b.BorrowerName ASC; 
 
 ########################################################################################################################
-
+9
 ########################################################################################################################
-
+10
 ########################################################################################################################
+11 - Math Champions
+  You are provided with two tables: Students and Grades. Write a SQL query to find students who have higher grade in Math than the 
+  average grades of all the students together in Math. Display student name and grade in Math order by grades. 
 
+Tables: Students
++--------------+-------------+
+| COLUMN_NAME  | DATA_TYPE   |
++--------------+-------------+
+| class_id     | int         |
+| student_id   | int         |
+| student_name | varchar(20) |
++--------------+-------------+
+
+Tables: Grades
++-------------+-------------+
+| COLUMN_NAME | DATA_TYPE   |
++-------------+-------------+
+| student_id  | int         |
+| subject     | varchar(20) |
+| grade       | int         |
++-------------+-------------+
+
+  Ans:-
+  SELECT
+    s.student_name,
+    g.grade AS math_grade
+FROM
+    Students s
+JOIN
+    Grades g ON s.student_id = g.student_id
+WHERE
+    g.subject = 'Math'
+AND
+    g.grade > (
+        SELECT AVG(grade)
+        FROM Grades
+        WHERE subject = 'Math'
+    )
+order by g.grade;
+
+PySpark:-
+  # Step 1: Calculate the average math grade
+avg_math_grade = grades_df.filter(grades_df.subject == 'Math').agg(F.avg('grade')).collect()[0][0]
+
+# Step 2: Perform the join
+result_df = students_df.join(grades_df, on='student_id', how='inner')
+
+# Step 3: Filter for Math grades above the average and sort
+result_df = result_df.filter((result_df.subject == 'Math') & (result_df.grade > avg_math_grade)) \
+                     .sort('grade') \
+                     .select('student_name', F.col('grade').alias('math_grade'))
+
+# Step 4: Show the result
+result_df.show()
+  
 ########################################################################################################################
 
 ########################################################################################################################
