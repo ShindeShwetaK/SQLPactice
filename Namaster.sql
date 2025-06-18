@@ -64,10 +64,100 @@ group by category
 order by no_of_products desc;
 
 ########################################################################################################################
-3-
+3- LinkedIn Top Voice
+LinkedIn is a professional social networking app. They want to give top voice badge to their best creators to encourage them to create more quality content.
+A creator qualifies for the badge if he/she satisfies following criteria.
+1- Creator should have more than 50k followers.
+2- Creator should have more than 100k impressions on the posts that they published in the month of Dec-2023.
+3- Creator should have published atleast 3 posts in Dec-2023.
+Write a SQL to get the list of top voice creators name along with no of posts and impressions by them in the month of Dec-2023.
+Table: creators(primary key : creator_id)
++--------------+-------------+
+| COLUMN_NAME  | DATA_TYPE   |
++--------------+-------------+
+| creator_id   | int         |
+| creator_name | varchar(20) |
+| followers    | int         |
++--------------+-------------+
+Table: posts(primary key : post_id)
++--------------+------------+
+| COLUMN_NAME  | DATA_TYPE  |
++--------------+------------+
+| creator_id   | int        |
+| post_id      | varchar(3) |
+| publish_date | date       |
+| impressions  | int        |
++--------------+------------+
+
+Ans:-
+select creator_name, 
+count(post_id) as total_post,
+sum(impressions) as total_impression 
+from creators c
+left join posts p
+on c.creator_id = p.creator_id
+where c.followers > 50000 and
+date_format(p.publish_date, '%Y%m') = '202312'
+group by  c.creator_name
+having 
+sum(p.impressions) > 100000
+and count(p.post_id) >= 3
+;
+
+Or
+  
+WITH post_summary AS (
+    SELECT 
+        c.creator_id,
+        c.creator_name, 
+        COUNT(p.post_id) AS total_post,
+        SUM(p.impressions) AS total_impression
+    FROM creators c
+    LEFT JOIN posts p ON c.creator_id = p.creator_id
+    WHERE c.followers > 50000 
+      AND DATE_FORMAT(p.publish_date, '%Y%m') = '202312'
+    GROUP BY c.creator_id, c.creator_name
+)
+
+SELECT *
+FROM post_summary
+WHERE total_impression > 100000
+  AND total_post >= 3;
 
 ########################################################################################################################
-4-
+4- - Premium Customers
+An e-commerce company want to start special reward program for their premium customers.  
+The customers who have placed a greater number of orders than the average number of orders placed by customers are considered as premium customers.
+Write an SQL to find the list of premium customers along with the number of orders placed by each of them, display the results in highest to lowest no of orders.
+Table: orders (primary key : order_id)
++---------------+-------------+
+| COLUMN_NAME   | DATA_TYPE   |
++---------------+-------------+
+| order_id      | int         |
+| order_date    | date        |
+| customer_name | varchar(20) |
+| sales         | int         |
++---------------+-------------+
+  Ans:
+  WITH customer_order_counts AS (
+    SELECT 
+        customer_name,
+        COUNT(order_id) AS total_orders
+    FROM orders
+    GROUP BY customer_name
+),
+average_order_count AS (
+    SELECT 
+        AVG(total_orders) AS avg_orders
+    FROM customer_order_counts
+)
+SELECT 
+    c.customer_name,
+    c.total_orders
+FROM customer_order_counts c
+JOIN average_order_count a
+  ON c.total_orders > a.avg_orders
+ORDER BY c.total_orders DESC;
 ########################################################################################################################
 5-
 ########################################################################################################################
@@ -99,7 +189,51 @@ group by household_id, bill_year
 order by household_id, bill_year;
 
 ########################################################################################################################
-7
+7- Airbnb Top Hosts
+  Suppose you are a data analyst working for a travel company that offers vacation rentals similar to Airbnb. 
+  Your company wants to identify the top hosts with the highest average ratings for their listings. 
+  This information will be used to recognize exceptional hosts and potentially offer them incentives to continue providing outstanding service.
+Your task is to write an SQL query to find the top 2 hosts with the highest average ratings for their listings. However,
+  you should only consider hosts who have at least 2 listings, as hosts with fewer listings may not be representative.
+Display output in descending order of average ratings and round the average ratings to 2 decimal places 
+
+Table: listings
++----------------+---------------+
+| COLUMN_NAME    | DATA_TYPE     |
++----------------+---------------+
+| host_id        | int           |
+| listing_id     | int           |
+| minimum_nights | int           |
+| neighborhood   | varchar(20)   |
+| price          | decimal(10,2) |
+| room_type      | varchar(20)   |
++----------------+---------------+
+Table: reviews
++-------------+-----------+
+| COLUMN_NAME | DATA_TYPE |
++-------------+-----------+
+| listing_id  | int       |
+| rating      | int       |
+| review_date | date      |
+| review_id   | int       |
++-------------+-----------+
+
+  Ans:-
+  
+WITH cte AS (  
+    SELECT host_id, listing_id  
+        , COUNT(*) OVER(PARTITION BY host_id) AS cnt_listings      --  Count listings per host using window function  
+    FROM listings  
+)  
+SELECT cte.host_id, cte.cnt_listings AS no_of_listings  
+    , ROUND(AVG(r.rating), 2) AS avg_rating                        --  Calculate average rating rounded to 2 decimals  
+FROM cte  
+INNER JOIN reviews r ON cte.listing_id = r.listing_id             --  Join with reviews on listing_id  
+WHERE cte.cnt_listings >= 2                                        --  Filter hosts with 2 or more listings  
+GROUP BY cte.host_id, cte.cnt_listings                             --  Group by host_id and listing count  
+ORDER BY avg_rating DESC                                           --  Order by average rating descending  
+LIMIT 2;                                                          --  Limit to top 2 hosts  
+
 ########################################################################################################################
 8 - Library Borrowing Habits
   Write an SQL to display the name of each borrower along with a comma-separated list of the books they have borrowed in alphabetical order
