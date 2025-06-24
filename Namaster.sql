@@ -329,8 +329,73 @@ result_df = result_df.filter((result_df.subject == 'Math') & (result_df.grade > 
 result_df.show()
   
 ########################################################################################################################
+12- Deliveroo Top Customer
+  You are provided with data from a food delivery service called Deliveroo. Each order has details about the delivery time, 
+  the rating given by the customer, and the total cost of the order. Write an SQL to find customer with highest total expenditure. 
+  Display customer id and total expense by him/her.
 
+Tables: orders
++---------------+-----------+
+| COLUMN_NAME   | DATA_TYPE |
++---------------+-----------+
+| customer_id   | int       |
+| delivery_time | int       |
+| order_id      | int       |
+| restaurant_id | int       |
+| total_cost    | int       |
++---------------+-----------+
+
+  Ans:-
+  select customer_id,
+sum(total_cost) as total_expense
+from orders  
+group by customer_id
+order by total_expense desc
+limit 1;
+  
 ########################################################################################################################
+13 - Best Employee Award
+TCS wants to award employees based on number of projects completed by each individual each month.  
+  Write an SQL to find best employee for each month along with number of projects completed by him/her in that month, 
+  display the output in descending order of number of completed projects.
+
+Table: projects
++-------------------------+-------------+
+| COLUMN_NAME             | DATA_TYPE   |
++-------------------------+-------------+
+| project_id              | int         |
+| employee_name           | varchar(10) |
+| project_completion_date | date        |
++-------------------------+-------------+
+
+Ans:-
+  WITH project_counts AS (
+    SELECT 
+        DATE_FORMAT(project_completion_date, '%Y%m') AS month,
+        employee_name,
+        COUNT(*) AS project_count
+    FROM projects
+    where project_completion_date is not null
+    GROUP BY month, employee_name
+),
+ranked_employees AS (
+    SELECT 
+        month,
+        employee_name,
+        project_count,
+        ROW_NUMBER() OVER (
+            PARTITION BY month
+            ORDER BY project_count DESC
+        ) AS rn
+    FROM project_counts
+)
+SELECT 
+    employee_name,
+    project_count as no_of_completed_projects,
+    month as yearmonth
+FROM ranked_employees
+WHERE rn = 1
+ORDER BY project_count DESC;
 
 ########################################################################################################################
 
