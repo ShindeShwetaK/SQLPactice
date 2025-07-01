@@ -428,7 +428,33 @@ from cte
 group by first_operation_year
 ORDER BY first_operation_year ASC;
 ########################################################################################################################
-
+18 - Hero Products
+Flipkart an ecommerce company wants to find out its top most selling product by quantity in each category. 
+In case of a tie when quantities sold are same for more than 1 product, then we need to give preference to the product with higher sales value.
+Display category and product in output with category in ascending order.
+Table: orders
++-------------+-------------+
+| COLUMN_NAME | DATA_TYPE   |
++-------------+-------------+
+| category    | varchar(10) |
+| order_id    | int         |
+| product_id  | varchar(20) |
+| quantity    | int         |
+| unit_price  | int         |
++-------------+-------------+
+  with sales as (
+select category,product_id,sum(quantity) as quantity_sold, sum(unit_price*quantity) total_sales
+ from orders
+ group by category,product_id
+)
+select category,product_id 
+from (
+select *
+ , row_number() over(partition by category order by quantity_sold desc,total_sales desc) as rn 
+ from sales 
+ ) s
+where rn=1
+ORDER BY category ASC;
 ########################################################################################################################
 
 ########################################################################################################################
@@ -436,6 +462,43 @@ ORDER BY first_operation_year ASC;
 ########################################################################################################################
 
 ########################################################################################################################
+24 - Account Balance
+You are given a list of users and their opening account balance along with the transactions done by them.
+  Write a SQL to calculate their account balance at the end of all the transactions. Please note that users can do 
+  transactions among themselves as well, display the output in ascending order of the final balance.
+Table: users
++-----------------+-------------+
+| COLUMN_NAME     | DATA_TYPE   |
++-----------------+-------------+
+| user_id         | int         |
+| username        | varchar(10) |
+| opening_balance | int         |
++-----------------+-------------+
+
+Table: transactions
++-------------+-----------+
+| COLUMN_NAME | DATA_TYPE |
++-------------+-----------+
+| id          | int       |
+| from_userid | int       |
+| to_userid   | int       |
+| amount      | int       |
++-------------+-----------+
+
+  with all_trans as (
+select from_userid as user_id    , -1*amount as amount from transactions 
+union all
+select to_userid, amount as amount from transactions 
+)
+,trans_amount as 
+(select user_id,sum(amount) as transact_amount
+from all_trans
+group by user_id
+)
+select u.username , opening_balance + coalesce(transact_amount,0) as final_balance
+from users u 
+left join trans_amount t on u.user_id=t.user_id
+ORDER BY final_balance ASC;
 ########################################################################################################################
 
 ########################################################################################################################
