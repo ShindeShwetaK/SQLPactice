@@ -2001,15 +2001,194 @@ GROUP BY category                                                               
 ORDER BY category;                                                                        --    Order results by category ascending
 
 ########################################################################################################################
+56 – Expenses Excluding MasterCard
+You're working for a financial analytics company that specializes in analyzing credit card expenditures. You have a dataset containing information about users' 
+credit card expenditures across different card companies.
+Write an SQL query to find the total expenditure from other cards (excluding Mastercard) for users who hold Mastercard.  Display only the users(along with Mastercard expense and other expense) 
+for which expense from other cards together is more than Mastercard expense.
+Table: expenditures
++--------------+-------------+
+| COLUMN_NAME  | DATA_TYPE   |
++--------------+-------------+
+| user_name    | varchar(10) |
+| expenditure  | int         |
+| card_company | varchar(15) |
++--------------+-------------+
+with mastercard as (
+select user_name,sum(expenditure) as expenditure
+from expenditures 
+where card_company='Mastercard'
+group by user_name
+)
+, non_mastercard as (
+select user_name,sum(expenditure) as expenditure
+from expenditures 
+where card_company!='Mastercard'
+group by user_name
+)
+select m.user_name, m.expenditure as mastercard_expense,nm.expenditure as other_expense
+from mastercard m 
+inner join non_mastercard nm on m.user_name=nm.user_name
+where nm.expenditure > m.expenditure;
+########################################################################################################################
+57 - Dashboard Visits
+Youre working as a data analyst for a popular websites dashboard analytics team.
+Your task is to analyze user visits to the dashboard and identify users who are highly engaged with the platform. 
+The dashboard records user visits along with timestamps to provide insights into user activity patterns.
+A user can visit the dashboard multiple times within a day. However, to be counted as separate visits, 
+there should be a minimum gap of 60 minutes between consecutive visits. If the next visit occurs within 60 minutes of the previous one, its
+considered part of the same visit.
+
+Table: dashboard_visit
++-------------+-------------+
+| COLUMN_NAME | DATA_TYPE   |
++-------------+-------------+
+| user_id     | varchar(10) |
+| visit_time  | datetime    |
++-------------+-------------+
+Write an SQL query to find total number of visits by each user along with number of distinct days user has visited the dashboard. 
+While calculating the number of distinct days you have to consider a visit even if it is same as previous days visit.
+So for example if there is a visit at 2024-01-12 23:30:00 and next visit at 2024-01-13 00:15:00 , 
+The visit on 13th will not be considered as new visit because it is within 1 hour window of previous visit but number of
+days will be counted as 2 only, display the output in ascending order of user id.
+	
+WITH previous_visits AS (
+    SELECT 
+        user_id,
+        visit_time,
+        LAG(visit_time) OVER (PARTITION BY user_id ORDER BY visit_time) AS previous_visit_time
+    FROM
+        dashboard_visit
+)
+, vigit_flag as (
+select user_id, previous_visit_time,visit_time
+, CASE WHEN previous_visit_time IS NULL THEN 1
+      WHEN TIMESTAMPDIFF(second, previous_visit_time, visit_time) / 3600 > 1 THEN 1
+            ELSE 0
+        END AS new_visit_flag
+from previous_visits
+)
+select user_id, sum(new_visit_flag) as no_of_visits, count(distinct CAST(visit_time as DATE)) as visit_days
+from vigit_flag
+group by user_id
+ORDER BY user_id ASC;
+########################################################################################################################
+58 - Final Account Balance
+You are given history of your bank account for the year 2020. Each transaction is either a credit card payment or
+incoming transfer. There is a fee of holding a credit card which you have to pay every month, Fee is 5 per month.
+However, you are not charged for a given month if you made at least 2 credit card payments for a total cost of at least 
+100 within that month. Note that this fee is not included in the supplied history of transactions.
+Each row in the table contains information about a single transaction. If the amount value is negative, it is a credit
+card payment otherwise it is an incoming transfer. At the beginning of the year, the balance of your account was 0 . 
+Your task is to compute the balance at the end of the year. 
+
+Table : Transactions 
++------------------+-----------+
+| COLUMN_NAME      | DATA_TYPE |
++------------------+-----------+
+| amount           | int       |
+| transaction_date | date      |
++------------------+-----------+
+with cte as (
+select month(transaction_date)  as tran_month ,amount
+ from transactions
+)
+,cte2 as (
+select tran_month
+, sum(amount) as net_amount , sum(case when amount<0 then -1*amount else 0 end) as credit_card_amount
+, sum(case when amount<0 then 1 else 0 end) as credit_card_transact_cnt
+from cte 
+group by tran_month
+)
+select sum(net_amount) - sum(case when credit_card_amount >=100 and credit_card_transact_cnt >=2 then 0 else 5 end)
+- 5*(12-(select count(distinct tran_month) from cte)) as final_balance
+from cte2;
 
 ########################################################################################################################
+59 - Order Lead Time
+You are given orders data of an online ecommerce company. Dataset contains order_id , order_date and ship_date. 
+Your task is to find lead time in days between order date and ship date using below rules:
+1- Exclude holidays. List of holidays present in holiday table. 
+2- If the order date is on weekends, then consider it as order placed on immediate next Monday 
+and if the ship date is on weekends, then consider it as immediate previous Friday to do calculations.
+For example, if order date is March 14th 2024 and ship date is March 20th 2024. Consider March 18th is 
+a holiday then lead time will be (20-14) -1 holiday = 5 days.
+Table: orders
++-------------+-----------+
+| COLUMN_NAME | DATA_TYPE |
++-------------+-----------+
+| order_date  | date      |
+| order_id    | int       |
+| ship_date   | date      |
++-------------+-----------+
+Table: holidays
++--------------+-----------+
+| COLUMN_NAME  | DATA_TYPE |
++--------------+-----------+
+| holiday_date | date      |
+| holiday_id   | int       |
++--------------+-----------+
+	
+with cte as (
+select *
+,case when WEEKDAY(order_date)=6 then DATE_ADD(order_date , INTERVAL 1 DAY) 
+when WEEKDAY(order_date)=5 then DATE_ADD(order_date , INTERVAL 2 DAY) 
+else order_date end as order_date_new
+,case when WEEKDAY(ship_date)=6 then DATE_ADD(ship_date , INTERVAL -2 DAY) 
+when WEEKDAY(ship_date)=5 then DATE_ADD(ship_date , INTERVAL -1 DAY) 
+else ship_date end as ship_date_new
+from orders
+)
+,cte2 as (
+select order_id,order_date_new,ship_date_new
+,DATEDIFF(ship_date_new,order_date_new) as no_of_days
+from cte
+)
+select order_id , no_of_days-count(holiday_date) as lead_time
+from cte2 
+left join holidays on holiday_date between order_date_new and ship_date_new
+group by order_id , no_of_days
+ORDER BY order_id ;
 
 ########################################################################################################################
+60 - Instagram Marketing Agency
+You are working for a marketing agency that manages multiple Instagram influencer accounts. 
+Your task is to analyze the engagement performance of these influencers before and after they join your company.
+Write an SQL query to calculate average engagement growth rate percent for each influencer after they joined your 
+company compare to before. Round the growth rate to 2 decimal places and sort the output in decreasing order of growth rate.
 
-########################################################################################################################
-
-########################################################################################################################
-
+Engagement = (# of likes + # of comments on each post)
+ 
+Table: influencers
++---------------+-------------+
+| COLUMN_NAME   | DATA_TYPE   |
++---------------+-------------+
+| influencer_id | int         |
+| join_date     | date        |
+| username      | varchar(10) |
++---------------+-------------+
+Table: posts
++---------------+-----------+
+| COLUMN_NAME   | DATA_TYPE |
++---------------+-----------+
+| comments      | int       |
+| influencer_id | int       |
+| likes         | int       |
+| post_date     | date      |
+| post_id       | int       |
++---------------+-----------+
+with cte as (
+select  i.username 
+, avg(case when p.post_date < i.join_date then (likes+comments) end) as before_engagement
+, avg(case when p.post_date > i.join_date then (likes+comments) end) as after_engagement
+from posts p
+inner join influencers i on i.influencer_id=p.influencer_id
+group by i.username 
+)
+select *
+,round((after_engagement-before_engagement)*100/before_engagement,2)  as growth
+from cte
+order by growth desc;
 ########################################################################################################################
 
 ########################################################################################################################
