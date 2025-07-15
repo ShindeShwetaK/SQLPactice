@@ -1111,19 +1111,241 @@ Tables: Employees
   order by salary_levels;
        
 ########################################################################################################################
+31 - Highly Paid Employees
+  You are given the data of employees along with their salary and department. Write an SQL to find list of employees who have
+  salary greater than average employee salary of the company.  However, while calculating the company average salary to compare 
+  with an employee salary do not consider salaries of that employee's department, display the output in ascending order of employee ids.
+
+Table: employee
++-------------+-------------+
+| COLUMN_NAME | DATA_TYPE   |
++-------------+-------------+
+| emp_id      | int         |
+| salary      | int         |
+| department  | varchar(15) |
++-------------+-------------+
+  select * from 
+employee e1
+where salary > (select avg(e2.salary) 
+from employee e2 
+where e1.department != e2.department
+)
+ORDER BY emp_id ;
+########################################################################################################################
+32 - Warikoo 20-6-20
+  Ankur Warikoo, an influential figure in Indian social media, shares a guideline in one of his videos called the 
+  20-6-20 rule for determining whether one can afford to buy a phone or not. The rule for affordability entails three conditions:
+1. Having enough savings to cover a 20 percent down payment.
+2. Utilizing a maximum 6-month EMI plan (no-cost) for the remaining cost.
+3. Monthly EMI should not exceed 20 percent of ones monthly salary.
+  Given the salary and savings of various users, along with data on phone costs, the task is to write an SQL to generate a list of phones 
+(comma-separated) that each user can afford based on these criteria, display the output in ascending order of the user name.
+Table: users
++----------------+-------------+
+| COLUMN_NAME    | DATA_TYPE   |
++----------------+-------------+
+| user_name      | varchar(10) |
+| monthly_salary | int         |
+| savings        | int         |
++----------------+-------------+
+Table: phones
++-------------+-------------+
+| COLUMN_NAME | DATA_TYPE   |
++-------------+-------------+
+| cost        | int         |
+| phone_name  | varchar(15) |
++-------------+-------------+
+  
+  select u.user_name,group_concat(p.phone_name SEPARATOR ',') as affordable_phones
+  from users u cross join phones p
+where u.savings >= p.cost*0.2 and u.monthly_salary*0.2 >= p.cost*0.8/6
+group by u.user_name
+ORDER BY u.user_name;
+########################################################################################################################
+33 - Average Order Value
+  Write an SQL query to determine the transaction date with the lowest average order value (AOV) among all dates recorded 
+  in the transaction table. Display the transaction date, its corresponding AOV, and the difference between the AOV for 
+  that date and the highest AOV for any day in the dataset. Round the result to 2 decimal places.
+
+Table: transactions 
++--------------------+--------------+
+| COLUMN_NAME        | DATA_TYPE    |
++--------------------+--------------+
+| order_id           | int          |
+| transaction_amount | decimal(5,2) |
+| transaction_date   | date         |
+| user_id            | int          |
++--------------------+--------------+
+  with cte as (
+select transaction_date, avg(transaction_amount) as aov
+ from transactions
+ group by transaction_date
+)
+, cte1 as (
+select *
+,row_number() over(order by aov) as rn
+,max(aov) over() as highest_aov
+from cte 
+)
+select transaction_date,round(aov,2) as aov,round(highest_aov-aov,2) as diff_from_highest_aov
+from cte1
+where rn=1;
+########################################################################################################################
+34 - Employee vs Manager
+  Medium - 20 Points
+You are given the table of employee details. Write an SQL to find details of employee with salary 
+  more than their manager salary but they joined the company after the manager joined.
+Display employee name, salary and joining date along with their managers salary and joining date,
+  sort the output in ascending order of employee name.
+Please note that manager id in the employee table referring to emp id of the same table.
+
+Table: employee
++--------------+-------------+
+| COLUMN_NAME  | DATA_TYPE   |
++--------------+-------------+
+| emp_id       | int         |
+| emp_name     | varchar(10) |
+| joining_date | date        |
+| salary       | int         |
+| manager_id   | int         |
++--------------+-------------+
+  select e.emp_name,e.salary,e.joining_date,m.salary as manager_salary
+,m.joining_date as manager_joining_date
+from employee e
+inner join employee m on e.manager_id=m.emp_id
+where e.salary>m.salary and e.joining_date > m.joining_date
+ORDER BY emp_name;
+########################################################################################################################
+35 - Cancellation vs Return
+  You are given an orders table containing data about orders placed on an e-commerce website, with information on order date, delivery date, 
+  and cancel date. The task is to calculate both the cancellation rate and the return rate for each month based on the order date.
+
+Definitions:
+
+An order is considered cancelled if it is cancelled before delivery (i.e., cancel_date is not null, and delivery_date is null).
+  If an order is cancelled, no delivery will take place.
+An order is considered a return if it is cancelled after it has already been delivered (i.e., cancel_date is not null,
+  and cancel_date > delivery_date).
+
+Metrics to Calculate:
+Cancel Rate = (Number of orders cancelled / Number of orders placed but not returned) * 100
+Return Rate = (Number of orders returned / Number of orders placed but not cancelled) * 100
+
+Write an SQL query to calculate the cancellation rate and return rate for each month (based on the order_date).
+  Round the rates to 2 decimal places. Sort the output by year and month in increasing order.
+
+Table: orders 
++---------------+-----------+
+| COLUMN_NAME   | DATA_TYPE |
++---------------+-----------+
+| order_id      | int       |
+| order_date    | date      |
+| customer_id   | int       |
+| delivery_date | date      |
+| cancel_date   | date      |
++---------------+-----------+
+  with cte as (
+select year(order_date) as order_year
+,month(order_date) as order_month,order_id
+,case when delivery_date is null and cancel_date is not null 
+then 1 else 0 end as cancel_flag 
+,case when delivery_date is not null and cancel_date is not null then 1 else 0 end as return_flag 
+from orders
+)
+select order_year,order_month
+,round(sum(cancel_flag)*100.0/(count(*)-sum(return_flag)),2)  as cancellation_rate
+,round(sum(return_flag)*100.0/(count(*)-sum(cancel_flag)),2) as return_rate
+from cte
+group by order_year,order_month
+order by order_year,order_month;
 
 ########################################################################################################################
+36 - Airbnb Business
+  You are planning to list a property on Airbnb. To maximize profits, you need to analyze the Airbnb data for the month of 
+  January 2023 to determine the best room type for each location. The best room type is based on the maximum average occupancy during the given month.
+
+Write an SQL query to find the best room type for each location based on the average occupancy days. Order the results in
+  descending order of average occupancy days, rounded to 2 decimal places.
+Table: listings
++----------------+---------------+
+| COLUMN_NAME    | DATA_TYPE     |
++----------------+---------------+
+| listing_id     | int           |
+| host_id        | int           |
+| location       | varchar(20)   |
+| room_type      | varchar(20)   |
+| price          | decimal(10,2) |
+| minimum_nights | int           |
++----------------+---------------+
+Table: bookings
++---------------+-----------+
+| COLUMN_NAME   | DATA_TYPE |
++---------------+-----------+
+| booking_id    | int       |
+| checkin_date  | date      |
+| checkout_date | date      |
+| listing_id    | int       |
++---------------+-----------+
+  with cte as (
+select listing_id, sum(checkout_date - checkin_date) as book_days
+ from bookings 
+  group by listing_id
+)
+, cte1 as (
+select l.location,l.room_type , avg(cte.book_days * 1.0) as avg_book_days 
+from cte
+inner join listings l on cte.listing_id=l.listing_id
+group by l.location,l.room_type 
+)
+select location,room_type,round(avg_book_days,2) as avg_book_days from (
+select *,
+ row_number() over(partition by location order by avg_book_days desc) as rn 
+from cte1 
+) s
+where rn=1
+order by avg_book_days desc;
 
 ########################################################################################################################
+37 - Spotify Popular Tracks
+  Suppose you are a data analyst working for Spotify (a music streaming service company) . Your company is interested in analyzing 
+  user engagement with playlists and wants to identify the most popular tracks among all the playlists.
 
-########################################################################################################################
+Write an SQL query to find the top 2 most popular tracks based on number of playlists they are part of. 
 
-########################################################################################################################
+Your query should return the top 2 track ID along with total number of playlist they are part of , sorted by the same and 
+  track id in descending order , Please consider only those playlists which were played by at least 2 distinct users.
 
-########################################################################################################################
-
-########################################################################################################################
-
+Table: playlists
++---------------+--------------+
+| COLUMN_NAME   | DATA_TYPE    |
++---------------+--------------+
+| playlist_id   | int          |
+| playlist_name | varchar(15) |
++---------------+--------------+
+Table: playlist_tracks
++-------------+-----------+
+| COLUMN_NAME | DATA_TYPE |
++-------------+-----------+
+| playlist_id | int       |
+| track_id    | int       |
++-------------+-----------+
+Table: playlist_plays
++-------------+------------+
+| COLUMN_NAME | DATA_TYPE  |
++-------------+------------+
+| playlist_id | int        |
+| user_id     | varchar(2) |
++-------------+------------+
+SELECT pt.track_id, count(distinct p.playlist_id) as no_of_playlist
+FROM playlists p
+INNER JOIN playlist_tracks pt ON p.playlist_id = pt.playlist_id 
+INNER JOIN (select playlist_id from playlist_plays
+group by playlist_id
+having count(distinct user_id)>1
+) t on t.playlist_id = pt.playlist_id 
+GROUP BY pt.track_id 
+ORDER BY no_of_playlist desc,pt.track_id DESC
+limit 2;
 ########################################################################################################################
 
 ########################################################################################################################
