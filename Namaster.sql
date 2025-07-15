@@ -1347,40 +1347,658 @@ GROUP BY pt.track_id
 ORDER BY no_of_playlist desc,pt.track_id DESC
 limit 2;
 ########################################################################################################################
+38 - Product Reviews
+  Suppose you are a data analyst working for a retail company, and your team is interested in analysing customer feedback to identify 
+  trends and patterns in product reviews.
+Your task is to write an SQL query to find all product reviews containing the word "excellent" or "amazing" in the review text. However,
+you want to exclude reviews that contain the word "not" immediately before "excellent" or "amazing". Please note that the words can be in 
+upper or lower case or combination of both. 
+
+Your query should return the review_id,product_id, and review_text for each review meeting the criteria, display the output in ascending order of review_id.
+
+Table: product_reviews
++-------------+--------------+
+| COLUMN_NAME | DATA_TYPE    |
++-------------+--------------+
+| review_id   | int          |
+| product_id  | int          |
+| review_text | varchar(40)  |
++-------------+--------------+
+  
+SELECT review_id, product_id, review_text
+FROM product_reviews                                                                                   --    Table containing product reviews
+WHERE (LOWER(review_text) LIKE '% excellent%' OR LOWER(review_text) LIKE '% amazing%')                --    Include reviews containing 'excellent' or 'amazing' (case-insensitive)
+  AND LOWER(review_text) NOT LIKE '%not excellent%'                                                  --    Exclude reviews with 'not excellent'
+  AND LOWER(review_text) NOT LIKE '%not amazing%'                                                    --    Exclude reviews with 'not amazing'
+ORDER BY review_id ASC;                                                                                --    Order results by review_id ascending
 
 ########################################################################################################################
+39 - Walmart Sales Pattern
+  You are tasked with analyzing the sales data of a Walmart chain with multiple stores across different locations.
+  The company wants to identify the highest and lowest sales months for each location for the year 2023 to gain insights 
+  into their sales patterns, display the output in ascending order of location. In case of a tie display the latest month.
+Table: stores
++-------------+-------------+
+| COLUMN_NAME | DATA_TYPE   |
++-------------+-------------+
+| store_id    | int         |
+| store_name  | varchar(20) |
+| location    | varchar(20) |
++-------------+-------------+
+Table: transactions 
++------------------+-----------+
+| COLUMN_NAME      | DATA_TYPE |
++------------------+-----------+
+| customer_id      | int       |
+| store_id         | int       |
+| amount           | int       |
+| transaction_date | date      |
+| transaction_id   | int       |
++------------------+-----------+
+WITH monthly_sales AS (
+    SELECT
+        s.location,
+        month(t.transaction_date) AS order_month,
+        SUM(t.amount) AS total_sales,
+        RANK() OVER (PARTITION BY s.location ORDER BY SUM(t.amount) DESC) AS sales_rank_desc,
+        RANK() OVER (PARTITION BY s.location ORDER BY SUM(t.amount)) AS sales_rank_asc
+    FROM
+        transactions t
+    JOIN
+        stores s ON t.store_id = s.store_id
+    GROUP BY
+        s.location, month(t.transaction_date))
+SELECT
+    location,
+    MAX(CASE WHEN sales_rank_desc = 1 THEN order_month END) AS highest_sales_month,
+    MAX(CASE WHEN sales_rank_asc = 1 THEN order_month END) AS lowest_sales_month
+FROM  monthly_sales
+GROUP BY location
+ORDER BY location;
 
 ########################################################################################################################
+40 – Uber Driver Ratings
+  Suppose you are a data analyst working for ride-sharing platform Uber. Uber is interested in analyzing the performance of drivers based on their ratings and
+  wants to categorize them into different performance tiers. 
+Write an SQL query to categorize drivers equally into three performance tiers (Top, Middle, and Bottom) based on their average ratings.
+  Drivers with the highest average ratings should be placed in the top tier, drivers with ratings below the top tier but above the bottom tier
+  should be placed in the middle tier, and drivers with the lowest average ratings should be placed in the bottom tier. Sort the output in decreasing 
+  order of average rating.
+Table : driver_ratings
++-------------+--------------+
+| COLUMN_NAME | DATA_TYPE    |
++-------------+--------------+
+| driver_id   | int          |
+| avg_rating  | decimal(3,2) |
++-------------+--------------+
+  SELECT driver_id,avg_rating,
+    CASE
+        WHEN tier = 1 THEN 'Top'
+        WHEN tier = 2 THEN 'Middle'
+        ELSE 'Bottom'
+    END AS performance_tier
+FROM (
+    SELECT
+        driver_id,avg_rating
+        ,NTILE(3) OVER (ORDER BY avg_rating DESC) AS tier
+    FROM
+        driver_ratings
+) AS ranked_drivers;
 
 ########################################################################################################################
+41 - Zomato Customer Behavior
+  Suppose you are a data analyst working for Zomato (a online food delivery company) . Zomato is interested in analysing customer 
+  food ordering behavior and wants to identify customers who have exhibited inconsistent patterns over time.
+
+Your task is to write an SQL query to identify customers who have placed orders on both weekdays and weekends, but with a significant 
+difference in the average order amount between weekdays and weekends. Specifically, you need to identify customers who have a minimum of 3 orders placed 
+both on weekdays and weekends each, and where the average order amount on weekends is at least 20% higher than the average order amount on weekdays.
+Your query should return the customer id, the average order amount on weekends, the average order amount on weekdays, and 
+the percentage difference (round to 2 decimal places) in average order amount between weekends and weekdays for each customer meeting the criteria.
+Table: orders
++--------------+---------------+
+| COLUMN_NAME  | DATA_TYPE     |
++--------------+---------------+
+| order_id     | int           |
+| customer_id  | int           |
+| order_amount | decimal(10,2) |
+| order_date   | date          |
++--------------+---------------+
+  WITH cte AS (
+SELECT *,CASE WHEN WEEKDAY(order_date) IN ('5', '6') THEN 'Weekend' ELSE 'Weekday' END AS day_type
+FROM orders
+)
+, order_summary as (
+SELECT customer_id ,day_type,
+		COUNT(day_type)OVER(PARTITION BY customer_id,day_type) AS order_count,
+		AVG(order_amount)OVER(PARTITION BY customer_id,day_type) AS avg_order_amount
+FROM cte
+),
+weekend_weekday_summary AS (
+SELECT customer_id,
+MAX(CASE WHEN day_type = 'Weekend' THEN order_count END) AS weekend_order_count,
+MAX(CASE WHEN day_type = 'Weekday' THEN order_count END) AS weekday_order_count,
+MAX(CASE WHEN day_type = 'Weekend' THEN avg_order_amount END) AS weekend_avg_amount,
+MAX(CASE WHEN day_type = 'Weekday' THEN avg_order_amount END) AS weekday_avg_amount
+FROM order_summary
+GROUP BY customer_id
+)
+SELECT customer_id,weekend_avg_amount,weekday_avg_amount
+,cast((weekend_avg_amount - weekday_avg_amount)*100.0 / weekday_avg_amount  as decimal(5,2) )AS percent_diff
+FROM weekend_weekday_summary
+where weekend_avg_amount>1.2*weekday_avg_amount
+and weekend_order_count>=3 and weekday_order_count>=3;
+########################################################################################################################
+42 - Points Table
+  Hard - 40 Points
+You are given table of cricket match played in a ICC cricket tournament with the details of winner for each match. 
+You need to derive a points table using below rules.
+1- For each win a team gets 2 points. 
+2- For a loss team gets 0 points.
+3- In case of a draw both the team gets 1 point each.
+Display team name , matches played, # of wins , # of losses and points.  Sort output in ascending order of team name.
+Table: icc_world_cup 
++-------------+-------------+
+| COLUMN_NAME | DATA_TYPE   |
++-------------+-------------+
+| team_1      | varchar(10) |
+| team_2      | varchar(10) |
+| winner      | varchar(10) |
++-------------+-------------+
+  with cte as (
+select team_1 as team_name
+, case when team_1=winner then 1 else 0 end as win_flag
+, case when winner='Draw' then 1 else 0 end as draw_flag
+from icc_world_cup 
+union all
+select team_2 as team_name
+, case when team_2=winner then 1 else 0 end as win_flag
+, case when winner='Draw' then 1 else 0 end as draw_flag
+from icc_world_cup 
+)
+select team_name,count(*) as match_played
+,sum(win_flag) as no_of_wins
+,count(*)-sum(win_flag)-sum(draw_flag) as no_of_losses
+,2*sum(win_flag)+sum(draw_flag) as total_points
+from cte
+group by team_name
+ORDER BY team_name ;
+########################################################################################################################
+43 - Customer Retention
+  Extreme Hard - 75 Points
+Customer retention can be defined as number of customers who continue to make purchases over a certain period compared to the 
+total number of customers. Heres a step-by-step approach to calculate customer retention rate:
+
+1- Determine the number of customers who made purchases 
+in the current period (e.g., month: m )
+2- Identify the number of customers from month m who made purchases 
+in month m+1 , m+2 as well.
+Suppose you are a data analyst working for Amazon. The company is interested in measuring customer retention over the months 
+  to understand how many customers continue to make purchases over time. Your task is to write an SQL to derive customer retention month over month,
+  display the output in ascending order of current year, month & future year, month.
+
+Table: orders
++-------------+-----------+
+| COLUMN_NAME | DATA_TYPE |
++-------------+-----------+
+| order_id    | int       |
+| customer_id | int       |
+| order_date  | date      |
++-------------+-----------+
+  WITH cte AS (
+    SELECT DISTINCT 
+        YEAR(order_date) AS year, 
+        MONTH(order_date) AS month, 
+        customer_id 
+    FROM orders
+)
+SELECT 
+    cm.year AS current_year,
+    cm.month AS current_month,
+    fm.year AS future_year,
+    fm.month AS future_month,
+    COUNT(DISTINCT cm.customer_id) AS total_customers,
+    COUNT(DISTINCT CASE WHEN fm.customer_id = cm.customer_id THEN fm.customer_id END) AS retained_customers
+FROM cte cm
+INNER JOIN cte fm 
+    ON (fm.year > cm.year OR (fm.year = cm.year AND fm.month > cm.month))
+GROUP BY cm.year, cm.month, fm.year, fm.month
+ORDER BY cm.year, cm.month, fm.year, fm.month;
 
 ########################################################################################################################
+44 - Excess/insufficient Inventory
+  Suppose you are a data analyst working for Flipkart. Your task is to identify excess and insufficient inventory at 
+  various Flipkart warehouses in terms of no of units and cost.  Excess inventory is when inventory levels are greater than inventory 
+  targets else its insufficient inventory.
+
+Write an SQL to derive excess/insufficient Inventory volume and value in cost for each location as well as at overall company level, 
+  display the results in ascending order of location id.
+
+Table: inventory
++------------------+-----------+
+| COLUMN_NAME      | DATA_TYPE |
++------------------+-----------+
+| inventory_level  | int       |
+| inventory_target | int       |
+| location_id      | int       |
+| product_id       | int       |
++------------------+-----------+
+Table: products
++-------------+--------------+
+| COLUMN_NAME | DATA_TYPE    |
++-------------+--------------+
+| product_id  | int          |
+| unit_cost   | decimal(5,2) |
++-------------+--------------+
+  with cte as (
+select i.location_id as location_id
+,sum(inventory_level-inventory_target) as excess_insufficient_qty
+,sum((inventory_level-inventory_target)*p.unit_cost) as excess_insufficient_value 
+from inventory i 
+inner join products p on i.product_id=p.product_id
+group by i.location_id)
+
+select CAST(location_id as CHAR) as location_id , excess_insufficient_qty,excess_insufficient_value
+from cte
+union all
+select 'Overall' as location_id 
+, sum(excess_insufficient_qty) as excess_insufficient_qty
+, sum(excess_insufficient_value) as excess_insufficient_value
+from cte
+ORDER BY location_id;
 
 ########################################################################################################################
+45 - Zomato Membership
+  Zomato is planning to offer a premium membership to customers who have placed multiple orders in a single day.
+
+Your task is to write a SQL to find those customers who have placed multiple orders in a single day at least once , 
+  total order value generate by those customers and order value generated only by those orders, display the results in ascending order of total order value.
+Table: orders (primary key : order_id)
++---------------+-------------+
+| COLUMN_NAME   | DATA_TYPE   |
++---------------+-------------+
+| customer_name | varchar(20) |
+| order_date    | datetime    |
+| order_id      | int         |
+| order_value   | int         |
++---------------+-------------+
+with cte as (
+select customer_name,CAST(order_date as DATE) as order_day
+,count(*) as no_of_orders
+ from orders 
+group by customer_name,CAST(order_date as DATE) 
+having count(*)>1
+)
+select orders.customer_name,sum(orders.order_value) as total_order_value
+,sum(case when cte.customer_name is not null then orders.order_value end) as order_value
+from orders
+left join cte on orders.customer_name=cte.customer_name and 
+CAST(orders.order_date as DATE) =cte.order_day
+where orders.customer_name in (select distinct customer_name from cte)
+group by orders.customer_name
+ORDER BY total_order_value;
+########################################################################################################################
+46 - Employees Inside Office (Part 1)
+  A company record its employees movement In and Out of office in a table. Please note below points about the data:
+1- First entry for each employee is “in”
+2- Every “in” is succeeded by an “out”
+3- Employee can work across days
+Write a SQL to find the number of employees inside the Office at "2019-04-01 19:05:00".
+Table: employee_record
++-------------+------------+
+| COLUMN_NAME | DATA_TYPE  |
++-------------+------------+
+| emp_id      | int        |
+| action      | varchar(3) |
+| created_at  | datetime   |
++-------------+------------+
+  with cte as (
+select *
+, lead(created_at) over(partition by emp_id order by created_at) as next_created_at
+ from employee_record )
+ select count(*) as no_of_emp_inside
+ from cte
+ where action='in'
+ and '2019-04-01 19:05:00' between created_at and next_created_at;
 
 ########################################################################################################################
+47 - Employees Inside Office (Part 2)
+  A company record its employees movement In and Out of office in a table. Please note below points about the data:
+1- First entry for each employee is “in”
+2- Every “in” is succeeded by an “out”
+3- Employee can work across days
+Write an SQL to measure the time spent by each employee inside the office between “2019-04-01 14:00:00” and 2019-04-02 10:00:00 in minutes, 
+  display the output in ascending order of employee id .
+Table: employee_record
++-------------+------------+
+| COLUMN_NAME | DATA_TYPE  |
++-------------+------------+
+| emp_id      | int        |
+| action      | varchar(3) |
+| created_at  | datetime   |
++-------------+------------+
+  with cte as (
+select *
+, lead(created_at) over(partition by emp_id order by created_at) as next_created_at
+ from employee_record
+ ),
+ considered_time as (
+ select emp_id
+ , case when created_at < '2019-04-01 14:00:00' then '2019-04-01 14:00:00' else created_at end as in_time
+ , case when next_created_at > '2019-04-02 10:00:00' then '2019-04-02 10:00:00' else next_created_at end as out_time
+ from cte
+ where action='in'
+ )
+select emp_id 
+, ROUND(sum(case when in_time>=out_time then 0 else TIMESTAMPDIFF(minute,in_time,out_time) end) , 1 ) as time_spent_in_mins
+from considered_time
+group by emp_id
+ORDER BY emp_id;
+########################################################################################################################
+48 – Female Contribution
+  Medium - 20 Points
+You are given a history of credit card transaction data for the people of India across cities. 
+  Write an SQL to find percentage contribution of spends by females in each city.  Round the percentage
+  to 2 decimal places. Display city, total spend , female spend and female contribution in ascending order of city.
+Table: credit_card_transactions
++------------------+-------------+
+| COLUMN_NAME      | DATA_TYPE   |
++------------------+-------------+
+| amount           | int         |
+| card_type        | varchar(10) |
+| city             | varchar(10) |
+| gender           | varchar(1)  |
+| transaction_date | date        |
+| transaction_id   | int         |
++------------------+-------------+
+  select city,sum(amount) as total_spend
+, sum(case when gender='F' then amount else 0 end) as female_spend
+, round(sum(case when gender='F' then amount else 0 end)*1.0/sum(amount)*100,2) as female_contribution
+from credit_card_transactions
+group by city
+ORDER BY city ;
+########################################################################################################################
+49 - Credit Card Transactions (Part-1)
+  You are given a history of credit card transaction data for the people of India across cities . 
+  Write an SQL to find how many days each city took to reach cumulative spend of 1500 from its first day of transactions. 
+Display city, first transaction date , date of 1500 spend and # of days in the ascending order of city.
+
+Table: credit_card_transactions
++------------------+-------------+
+| COLUMN_NAME      | DATA_TYPE   |
++------------------+-------------+
+| transaction_id   | int         |
+| transaction_date | date        |
+| amount           | int         |
+| card_type        | varchar(12) |
+| city             | varchar(20) |
+| gender           | varchar(1)  |
++------------------+-------------+
+  with cte as (
+select city, transaction_date, sum(amount) as total_amount
+,min(transaction_date) over(partition by city) as first_transaction_date
+from credit_card_transactions
+group by city,transaction_date
+)
+,cte2 as (
+select *
+,sum(total_amount) over(partition by city order by transaction_date rows between unbounded preceding and current row) as cum_sum
+ from cte
+)
+select city, first_transaction_date,MIN(transaction_date) as tran_date_1500
+, MIN(transaction_date) - first_transaction_date as no_of_days
+from cte2 
+where cum_sum>=1500
+group by city,first_transaction_date
+ORDER BY city;
+########################################################################################################################
+50 - Adverse Reactions
+In the field of pharmacovigilance, its crucial to monitor and assess adverse reactions that patients may experience after
+taking certain medications. Adverse reactions, also known as side effects, can range from mild to severe and can impact the safety and efficacy of a medication.
+For each medication, count the number of adverse reactions reported within the first 30 days of the prescription being issued.
+Assume that the prescription date in the Prescriptions table represents the start date of the medication usage, 
+display the output in ascending order of medication name.
+
+Table: patients
++-------------+-------------+
+| COLUMN_NAME | DATA_TYPE   |
++-------------+-------------+
+| patient_id  | int         |
+| name        | varchar(20) |
+| age         | int         |
+| gender      | varchar(10) |
++-------------+-------------+
+Table: medications
++-----------------+-------------+
+| COLUMN_NAME     | DATA_TYPE   |
++-----------------+-------------+
+| manufacturer    | varchar(20) |
+| medication_id   | int         |
+| medication_name | varchar(20) |
++-----------------+-------------+
+Table: prescriptions
++-------------------+-----------+
+| COLUMN_NAME       | DATA_TYPE |
++-------------------+-----------+
+| prescription_id   | int       |
+| patient_id        | int       |
+| medication_id     | int       |
+| prescription_date | date      |
++-------------------+-----------+
+Table: adverse_reactions
++----------------------+-------------+
+| COLUMN_NAME          | DATA_TYPE   |
++----------------------+-------------+
+| patient_id           | int         |
+| reaction_date        | date        |
+| reaction_description | varchar(20) |
+| reaction_id          | int         |
++----------------------+-------------+
+  SELECT 
+    m.medication_name,
+    m.manufacturer,
+    COUNT(AR.reaction_id) AS num_adverse_reactions
+FROM 
+    Medications m
+INNER JOIN 
+    Prescriptions p ON M.medication_id = p.medication_id
+LEFT JOIN 
+    adverse_reactions ar ON p.patient_id = AR.patient_id
+                        AND AR.reaction_date BETWEEN P.prescription_date AND DATE_ADD(P.prescription_date , INTERVAL 30 DAY)
+GROUP BY 
+    m.medication_name, m.manufacturer
+ORDER BY m.medication_name;
+########################################################################################################################
+51 - Balanced Team
+  Suppose you are a manager of a data analytics company. You are tasked to build a new team consists of senior and junior data analysts. 
+  The total budget for the salaries is 70000.  You need to use the below criterion for hiring.
+1- Keep hiring the seniors with the smallest salaries until you cannot hire anymore seniors.
+2- Use the remaining budget to hire the juniors with the smallest salaries until you cannot hire anymore juniors.
+Display employee id, experience and salary. Sort in decreasing order of salary.
+
+Table: candidates
++-------------+-------------+
+| COLUMN_NAME | DATA_TYPE   |
++-------------+-------------+
+| emp_id      | int         |
+| experience  | varchar(6) |
+| salary      | int         |
++-------------+-------------+
+with total_sal as (
+select *
+,sum(salary) over(partition by experience order by salary rows between unbounded preceding and current row) as running_sal
+ from candidates
+)
+,seniors as (
+select * 
+from total_sal
+where experience='Senior' and running_sal<=70000
+)
+select emp_id,experience,salary from seniors
+union all
+select emp_id,experience,salary from total_sal 
+where experience='Junior' 
+and running_sal<=70000-(select sum(salary) from seniors)
+order by salary desc;
+########################################################################################################################
+52 - Loan Repayment
+Youre working for a large financial institution that provides various types of loans to customers. 
+Your task is to analyze loan repayment data to assess credit risk and improve risk management strategies.
+Write an SQL to create 2 flags for each loan as per below rules. Display loan id, loan amount , due date and the 2 flags.
+
+1- fully_paid_flag: 1 if the loan was fully repaid irrespective of payment date else it should be 0.
+2- on_time_flag : 1 if the loan was fully repaid on or before due date else 0.
+Table: loans
++-------------+-----------+
+| COLUMN_NAME | DATA_TYPE |
++-------------+-----------+
+| loan_id     | int       |
+| customer_id | int       |
+| loan_amount | int       |
+| due_date    | date      |
++-------------+-----------+
+Table: payments
++--------------+-----------+
+| COLUMN_NAME  | DATA_TYPE |
++--------------+-----------+
+| amount_paid  | int       |
+| loan_id      | int       |
+| payment_date | date      |
+| payment_id   | int       |
++--------------+-----------+
+  
+SELECT 
+    l.loan_id, 
+    l.loan_amount, 
+    l.due_date,
+    CASE WHEN SUM(p.amount_paid) = l.loan_amount THEN 1 ELSE 0 END AS fully_paid_flag                --    Flag set to 1 if total amount paid equals loan amount, else 0
+   ,CASE WHEN SUM(CASE WHEN p.payment_date <= l.due_date THEN p.amount_paid END) = l.loan_amount THEN 1 ELSE 0 END AS on_time_flag  --    Flag set to 1 if full loan amount paid on or before due date, else 0
+FROM loans l                                                                                       --    Loans table alias 'l'
+LEFT JOIN payments p ON l.loan_id = p.loan_id                                                     --    Left join with payments table on loan_id
+GROUP BY l.loan_id, l.loan_amount, l.due_date                                                     --    Group by loan details to aggregate payments
+ORDER BY l.loan_id;                                                                               --    Order results by loan_id ascending
 
 ########################################################################################################################
+53 - LinkedIn Recommendation
+  LinkedIn stores information of post likes in below format. Every time a user likes a post there will be an entry made in post likes table.
+Table : post_likes 
++-------------+-----------+
+| COLUMN_NAME | DATA_TYPE |
++-------------+-----------+
+| post_id     | int       |
+| user_id     | int       |
++-------------+-----------+
+LinkedIn also stores the information when someone follows another user in below format.
+Table : user_follows
++-----------------+-----------+
+| COLUMN_NAME     | DATA_TYPE |
++-----------------+-----------+
+| follows_user_id | int       |
+| user_id         | int       |
++-----------------+-----------+
+The marketing team wants to send one recommendation post to each user . Write an SQL to find out that one post id for each user 
+  that is liked by the most number of users that they follow. Display user id, post id and no of likes.
+Please note that team do not want to recommend a post which is already liked by the user. If for any user,  2 or more posts are 
+  liked by equal number of users that they follow then select the smallest post id, display the output in ascending order of user id.
+  
+  with cte as (
+select f.user_id,p.post_id,count(*) as no_of_likes
+from user_follows f 
+inner join post_likes p on f.follows_user_id = p.user_id 
+group by f.user_id,p.post_id
+)
+select user_id,post_id,no_of_likes from (
+select cte.* 
+,row_number() over(partition by cte.user_id order by no_of_likes desc, cte.post_id ) as rn
+from cte
+left join post_likes p on p.user_id=cte.user_id and p.post_id=cte.post_id
+where p.post_id is null
+) s
+where rn=1
+ORDER BY user_id;
 
 ########################################################################################################################
-
+54 - Employees Payout
+  An IT company pays its employees on hourly basis. You are given the database of employees along with their department id.
+Table: employees
++-------------+-------------+
+| COLUMN_NAME | DATA_TYPE   |
++-------------+-------------+
+| emp_id      | int         |
+| emp_name    | varchar(20) |
+| dept_id     | int         |
++-------------+-------------+
+Department table which consist of hourly rate for each department.
+Table: dept
++-------------+-----------+
+| COLUMN_NAME | DATA_TYPE |
++-------------+-----------+
+| dept_id     | int       |
+| hourly_rate | int       |
++-------------+-----------+
+Given the daily entry_time and exit_time of each employee, calculate the total amount payable to each employee.
+Table: daily_time
++-------------+-----------+
+| COLUMN_NAME | DATA_TYPE |
++-------------+-----------+
+| emp_id      | int       |
+| entry_time  | datetime  |
+| exit_time   | datetime  |
++-------------+-----------+
+Please note that company also pays overtime to employees who work for more than 8 hours a day which is 1.5 times of hourly rate. 
+  So for example if hourly rate is 10 and a employee works for 9 hours then total payable will be 10*8+15*1 = 95 for that day.
+  In this example 95 is total payout and 15 is overtime payout.  Round the result to 
+  2 decimal places and sort the output by decreasing order of total payout.
+  
+with cte as (
+select e.emp_name ,d.hourly_rate ,TIMESTAMPDIFF(second, entry_time, exit_time)/3600.0 as total_hours
+from daily_time t 
+inner join employees e on t.emp_id=e.emp_id
+inner join dept d on d.dept_id=e.dept_id
+)
+select emp_name
+,ROUND(sum(case when total_hours <=8 then total_hours*hourly_rate*1.0
+else 8*hourly_rate*1.0 + (total_hours-8)*hourly_rate*1.5 end),2) as total_payout
+,ROUND(sum(case when total_hours <=8 then 0
+else (total_hours-8)*hourly_rate*1.5 end),2) as overtime_payout
+from cte 
+group by emp_name
+order by total_payout desc;
+ 
 ########################################################################################################################
+55 - Lowest Price
+  You own a small online store, and want to analyze customer ratings for the products that youre selling. 
+  After doing a data pull, you have a list of products and a log of purchases. Within the purchase log, each record includes the number of stars (from 1 to 5) as a customer rating for the product.
 
-########################################################################################################################
+For each category, find the lowest price among all products that received at least one 4-star or above rating from customers.
+If a product category did not have any products that received at least one 4-star or above rating, the lowest price is considered to be 0.
+  The final output should be sorted by product category in alphabetical order.
 
-########################################################################################################################
-
-########################################################################################################################
-
-########################################################################################################################
-
-########################################################################################################################
-
-########################################################################################################################
-
-########################################################################################################################
-
-########################################################################################################################
+Table: products
++-------------+-------------+
+| COLUMN_NAME | DATA_TYPE   |
++-------------+-------------+
+| category    | varchar(10) |
+| id          | int         |
+| name        | varchar(20) |
+| price       | int         |
++-------------+-------------+
+Table: purchases
++-------------+-----------+
+| COLUMN_NAME | DATA_TYPE |
++-------------+-----------+
+| id          | int       |
+| product_id  | int       |
+| stars       | int       |
++-------------+-----------+
+  
+SELECT 
+    category,
+    COALESCE(MIN(CASE WHEN pur.product_id IS NOT NULL THEN price END), 0) AS price          --    Minimum price of products purchased with 4 or 5 stars, default 0 if none
+FROM products p                                                                            --    Products table alias 'p'
+LEFT JOIN purchases pur ON p.id = pur.product_id AND pur.stars IN (4, 5)                   --    Left join purchases with 4 or 5 star ratings
+GROUP BY category                                                                         --    Group results by product category
+ORDER BY category;                                                                        --    Order results by category ascending
 
 ########################################################################################################################
 
